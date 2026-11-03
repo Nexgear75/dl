@@ -1,0 +1,5 @@
+/dist/
+daemon/target/
+tui/node_modules/
+.DS_Store
+*.log

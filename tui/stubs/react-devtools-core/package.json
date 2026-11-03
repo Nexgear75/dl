@@ -1,0 +1,7 @@
+{
+  "name": "react-devtools-core",
+  "version": "0.0.0-stub",
+  "description": "Stub: Ink only loads devtools when DEV=true; keeps the compiled binary self-contained.",
+  "type": "module",
+  "main": "index.js"
+}
