@@ -152,18 +152,20 @@ uninstall() {
 
 # ---------------------------------------------------------------- main
 main() {
-  local want_dl=0 want_tf=0 a
+  local want_dl=0 want_tf=0 do_uninstall=0 a
   for a in "$@"; do
     case "$a" in
       dl) want_dl=1 ;;
       tf) want_tf=1 ;;
       all | both) want_dl=1; want_tf=1 ;;
       -y | --yes) ASSUME_YES=1 ;;
-      --uninstall) uninstall; return ;;
+      --uninstall) do_uninstall=1 ;;
       -h | --help) echo "usage: install.sh [dl] [tf] [--yes] [--uninstall]   (PREFIX=… to change $PREFIX)"; return ;;
       *) die "unknown option: $a (use: dl, tf, --yes, --uninstall)" ;;
     esac
   done
+
+  if [ "$do_uninstall" = 1 ]; then uninstall; return; fi
 
   [ "$(uname -s)" = Darwin ] || die "dl and tf run on macOS only"
   ARCH="$(uname -m)"
