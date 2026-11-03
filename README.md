@@ -26,17 +26,31 @@ i add · p pause · P all · dd remove · l/L limit · c clear · ⏎ details ·
 - **Videos** (YouTube, Vimeo, Twitch, X, TikTok… via yt-dlp): choose quality and audio language when the video has several tracks. Playlists are expanded. Prefix any URL with `yt:` to force yt-dlp.
 - **Link lists**: a `.txt`/`.md` file (or several pasted links) adds everything at once; quality/language is asked once for the whole batch.
 - **Path autocompletion**: directories first, prefix → substring → fuzzy matching, only relevant files shown.
-- **Background daemon**: downloads keep running after you quit; `dl` reattaches to them. The session survives restarts.
+- **Background daemon**: downloads keep running after you quit; `dl` reattaches to them. It stops by itself after 5 minutes with nothing to do and starts again when needed; the session survives restarts.
+- **Arrow keys or vim keys**: everything works with `↑ ↓ ← →`, `Home`/`End`, `PgUp`/`PgDn`, `⌫`… and the vim equivalents.
 - Pause/resume, cancel (deletes partial data), retry, per-download and global speed limits, macOS notifications.
 
 ## Install
 
-Requirements: `aria2`, `yt-dlp`, `ffmpeg` (runtime), `cargo` and `bun` (build).
+macOS (Apple Silicon or Intel), one command:
 
 ```sh
-brew install aria2 yt-dlp ffmpeg
-./scripts/install.sh          # installs dl and dl-daemon into ~/.local/bin
+curl -fsSL https://raw.githubusercontent.com/Nexgear75/dl/master/install.sh | bash
 ```
+
+It asks whether to install **dl**, [**tf**](https://github.com/Nexgear75/torrent-finder) (torrent search that sends its results to dl) or both, installs what they need with Homebrew (aria2, yt-dlp, ffmpeg; Homebrew itself if missing), puts the binaries in `~/.local/bin` and adds that folder to your `PATH`.
+
+Non-interactive: `… | bash -s -- dl` (or `dl tf`, `--yes`). Uninstall: `… | bash -s -- --uninstall`.
+
+### Updates
+
+Nothing to do. At most once an hour dl checks for a new release in the background, downloads it, verifies its checksum and swaps the binaries; the next launch runs the new version and says so. yt-dlp is upgraded with Homebrew once a day (sites change, old versions break). The background daemon switches to the new version by itself as soon as nothing is downloading.
+
+`dl update` updates right away. `DL_NO_AUTOUPDATE=1` turns automatic updates off.
+
+### From source
+
+Requires `cargo` and `bun`: `./scripts/install.sh` builds and installs into `~/.local/bin`.
 
 ## Usage
 
@@ -44,20 +58,21 @@ brew install aria2 yt-dlp ffmpeg
 dl                      # open the interface
 dl <link|file>          # open and add something right away
 dl --stop               # stop the background daemon
+dl update               # update now
 ```
 
 ### Keys
 
 | Normal mode | |
 |---|---|
-| `j` `k` / `↓` `↑` | move |
-| `gg` / `G` | top / bottom |
-| `ctrl-d` / `ctrl-u` | half page down / up |
+| `↓` `↑` / `j` `k` | move |
+| `Home` `End` / `gg` `G` | top / bottom |
+| `PgDn` `PgUp` / `ctrl-d` `ctrl-u` | page down / up |
 | `i` `a` | add a link, magnet or file |
-| `⏎` | details · pick torrent files |
+| `⏎` `→` / `←` | details · pick torrent files / close details |
 | `p` `space` | pause / resume |
 | `P` | pause / resume all |
-| `dd` `x` | remove (cancelling deletes partial data, finished files are kept) |
+| `⌫` `dd` `x` | remove (cancelling deletes partial data, finished files are kept) |
 | `r` | retry a failed download |
 | `l` / `L` | speed limit for the selection / global (`2M`, `500K`, `0`) |
 | `c` | clear finished downloads |
@@ -74,7 +89,7 @@ dl --stop               # stop the background daemon
 | `ctrl-w` / `ctrl-u` | delete word / line |
 | `esc` | back to normal mode |
 
-Pickers: `j`/`k`, `space` toggle, `a` all/none, `⏎` confirm, `esc` cancel.
+Pickers: `↑`/`↓` (or `j`/`k`), `space` toggle, `a` all/none, `⏎` confirm, `esc` cancel.
 
 ## Configuration
 
@@ -86,6 +101,7 @@ max_concurrent = 5      # simultaneous downloads (aria2 and yt-dlp each)
 connections = 16        # connections per HTTP download
 global_limit = "0"      # e.g. "5M"
 notifications = true
+idle_exit_minutes = 5   # stop the daemon after N idle minutes (0 = never)
 aria2c_path = "aria2c"
 ytdlp_path = "yt-dlp"
 ```

@@ -6,10 +6,10 @@ const SECTIONS: [string, [string, string][]][] = [
   [
     'Navigation',
     [
-      ['j / k  ↓ ↑', 'move'],
-      ['gg / G', 'top / bottom'],
-      ['ctrl-d / ctrl-u', 'half page down / up'],
-      ['⏎', 'details · torrent files'],
+      ['↓ ↑  j / k', 'move'],
+      ['home end  gg G', 'top / bottom'],
+      ['pgdn pgup  ^d ^u', 'page down / up'],
+      ['⏎  → / ←', 'details · torrent files / close'],
     ],
   ],
   [
@@ -18,7 +18,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['i  a', 'add a link, magnet or file'],
       ['p  space', 'pause / resume'],
       ['P', 'pause / resume all'],
-      ['dd  x', 'remove (cancel deletes partial data)'],
+      ['⌫  dd  x', 'remove (cancel deletes partial data)'],
       ['r', 'retry a failed download'],
       ['l / L', 'speed limit: selected / global'],
       ['c', 'clear finished'],
@@ -51,7 +51,7 @@ function Section({ title, rows, last }: { title: string; rows: [string, string][
       <Text bold>{title}</Text>
       {rows.map(([k, v]) => (
         <Box key={k} flexShrink={0}>
-          <Box width={17} flexShrink={0}>
+          <Box width={18} flexShrink={0}>
             <Text color={ACCENT}>{k}</Text>
           </Box>
           <Text color={DIM} wrap="truncate">

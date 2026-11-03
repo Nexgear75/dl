@@ -38,8 +38,8 @@ export function Picker({ title, subtitle, items, multi, cursor, checked, width, 
   const slice = items.slice(start, start + visible);
   const count = checked.filter(Boolean).length;
   const hints = multi
-    ? 'j/k move · space toggle · a all/none · ⏎ confirm · esc cancel'
-    : 'j/k move · ⏎ select · esc cancel';
+    ? '↑↓ move · space toggle · a all/none · ⏎ confirm · esc cancel'
+    : '↑↓ move · ⏎ select · esc cancel';
 
   return (
     <Box width={width} height={height} justifyContent="center" flexShrink={0}>

@@ -147,9 +147,11 @@ function suggestionsFor(mode: Mode): Suggestion[] {
 interface Props {
   client: Client;
   initialInput?: string;
+  /** shown once at startup (e.g. "dl updated to v0.2.0") */
+  startNotice?: string;
 }
 
-export function App({ client, initialInput }: Props) {
+export function App({ client, initialInput, startNotice }: Props) {
   const { exit } = useApp();
   const { columns, rows } = useWindowSize();
   const width = Math.max(40, columns);
@@ -209,6 +211,9 @@ export function App({ client, initialInput }: Props) {
   }, [mode.t]);
 
   const say = useCallback((text: string, level: Notice['level'] = 'info') => setNotice({ text, level }), []);
+  useEffect(() => {
+    if (startNotice) say(startNotice, "ok");
+  }, []);
 
   // ------------------------------------------------ promise-based dialogs
   const ask = useCallback(
@@ -597,7 +602,17 @@ export function App({ client, initialInput }: Props) {
     }
     if (!d) return;
     if (key.escape) return setExpanded(new Set());
-    if (key.return) {
+    if (key.leftArrow) {
+      if (!expanded.has(d.id)) return;
+      const next = new Set(expanded);
+      next.delete(d.id);
+      return setExpanded(next);
+    }
+    if (key.rightArrow && d.status !== 'selecting') {
+      if (expanded.has(d.id)) return;
+      return setExpanded(new Set(expanded).add(d.id));
+    }
+    if (key.return || key.rightArrow) {
       if (d.status === 'selecting') return void chooseFiles(d);
       const next = new Set(expanded);
       if (next.has(d.id)) next.delete(d.id);
@@ -605,7 +620,7 @@ export function App({ client, initialInput }: Props) {
       return setExpanded(next);
     }
     if (input === 'p' || input === ' ') return void togglePause(d);
-    if (input === 'x') return void removeSel(d);
+    if (input === 'x' || key.delete || key.backspace) return void removeSel(d);
     if (input === 'd') {
       if (pend === 'd') return void removeSel(d);
       pendingKey.current = { k: 'd', at: now };
@@ -706,8 +721,8 @@ export function App({ client, initialInput }: Props) {
       if (input === 'k' || key.upArrow) return setMode({ ...m, cursor: Math.max(0, m.cursor - 1) });
       if (input === 'g' || key.home) return setMode({ ...m, cursor: 0 });
       if (input === 'G' || key.end) return setMode({ ...m, cursor: n - 1 });
-      if (key.ctrl && input === 'd') return setMode({ ...m, cursor: Math.min(n - 1, m.cursor + 10) });
-      if (key.ctrl && input === 'u') return setMode({ ...m, cursor: Math.max(0, m.cursor - 10) });
+      if ((key.ctrl && input === 'd') || key.pageDown) return setMode({ ...m, cursor: Math.min(n - 1, m.cursor + 10) });
+      if ((key.ctrl && input === 'u') || key.pageUp) return setMode({ ...m, cursor: Math.max(0, m.cursor - 10) });
       if (m.multi && input === ' ') {
         const checked = [...m.checked];
         checked[m.cursor] = !checked[m.cursor];
