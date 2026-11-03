@@ -9,7 +9,7 @@ const SECTIONS: [string, [string, string][]][] = [
       ['j / k  ↓ ↑', 'move'],
       ['gg / G', 'top / bottom'],
       ['ctrl-d / ctrl-u', 'half page down / up'],
-      ['⏎', 'details · pick torrent files'],
+      ['⏎', 'details · torrent files'],
     ],
   ],
   [
@@ -45,29 +45,50 @@ const SECTIONS: [string, [string, string][]][] = [
   ],
 ];
 
-export function Help({ width, height }: { width: number; height: number }) {
+function Section({ title, rows, last }: { title: string; rows: [string, string][]; last?: boolean }) {
   return (
-    <Box width={width} height={height} justifyContent="center">
-      <Box flexDirection="column" borderStyle="round" borderColor={ACCENT} paddingX={2} width={Math.min(width, 64)}>
-        <Text bold color={ACCENT}>
-          Keys
-        </Text>
-        {SECTIONS.map(([title, rows]) => (
-          <Box key={title} flexDirection="column" marginTop={1}>
-            <Text bold>{title}</Text>
-            {rows.map(([k, v]) => (
-              <Box key={k}>
-                <Box width={20}>
-                  <Text color={ACCENT}>{k}</Text>
-                </Box>
-                <Text color={DIM}>{v}</Text>
-              </Box>
-            ))}
+    <Box flexDirection="column" marginBottom={last ? 0 : 1} flexShrink={0}>
+      <Text bold>{title}</Text>
+      {rows.map(([k, v]) => (
+        <Box key={k} flexShrink={0}>
+          <Box width={17} flexShrink={0}>
+            <Text color={ACCENT}>{k}</Text>
           </Box>
-        ))}
-        <Box marginTop={1}>
+          <Text color={DIM} wrap="truncate">
+            {v}
+          </Text>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+export function Help({ width, height }: { width: number; height: number }) {
+  const wide = width >= 96;
+  const [nav, downloads, input, app] = SECTIONS;
+  return (
+    <Box width={width} height={height} justifyContent="center" overflow="hidden">
+      <Box flexDirection="column" borderStyle="round" borderColor={ACCENT} paddingX={2} width={Math.min(width, wide ? 96 : 60)}>
+        <Box justifyContent="space-between" flexShrink={0}>
+          <Text bold color={ACCENT}>
+            Keys
+          </Text>
           <Text color={DIM}>any key to close</Text>
         </Box>
+        {wide ? (
+          <Box>
+            <Box flexDirection="column" width="50%" paddingRight={2}>
+              <Section title={nav[0]} rows={nav[1]} />
+              <Section title={input[0]} rows={input[1]} />
+              <Section title={app[0]} rows={app[1]} last />
+            </Box>
+            <Box flexDirection="column" width="50%" paddingRight={2}>
+              <Section title={downloads[0]} rows={downloads[1]} last />
+            </Box>
+          </Box>
+        ) : (
+          SECTIONS.map(([t, r], i) => <Section key={t} title={t} rows={r} last={i === SECTIONS.length - 1} />)
+        )}
       </Box>
     </Box>
   );

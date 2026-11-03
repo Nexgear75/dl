@@ -53,7 +53,6 @@ async function main() {
   const app = render(<App client={client} initialInput={initial || undefined} />, {
     alternateScreen: true,
     exitOnCtrlC: false,
-    incrementalRendering: true,
     maxFps: 30,
   });
   await app.waitUntilExit();
