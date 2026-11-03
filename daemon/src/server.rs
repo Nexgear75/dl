@@ -69,7 +69,7 @@ async fn dispatch(core: &Arc<Core>, method: &str, p: Value) -> Result<Value> {
             } else {
                 None
             };
-            core.add(&need(&p, "input")?, s(&p, "dir"), video).await?
+            core.add(&need(&p, "input")?, s(&p, "dir"), video, p["select"].as_bool().unwrap_or(true)).await?
         }
         "select" => {
             let idx: Vec<u32> = serde_json::from_value(p["indices"].clone()).unwrap_or_default();

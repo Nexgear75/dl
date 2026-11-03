@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 
 use crate::aria2::Aria2;
@@ -76,8 +76,23 @@ fn uploaded_copy(dir: &str, data: &[u8]) -> String {
     Path::new(dir).join(format!("{hash}.torrent")).display().to_string()
 }
 
+/// A magnet whose metadata download has no peer is paused then resumed after
+/// this long: aria2 then announces to its trackers and asks the DHT again,
+/// instead of waiting for the tracker interval (often 30 min).
+const META_KICK_AFTER: Duration = Duration::from_secs(45);
+
+#[derive(Default)]
+struct MetaIdle {
+    /// since when it has had no connection
+    since: Option<Instant>,
+    /// paused by us, to resume on the next poll
+    kicking: bool,
+    kicks: u32,
+}
+
 struct Inner {
     p: Persist,
+    meta_idle: HashMap<String, MetaIdle>,
     order: HashMap<String, u64>,
     seen_incomplete: HashSet<String>,
     notified: HashSet<String>,
@@ -217,6 +232,7 @@ impl Core {
             inner: Mutex::new(Inner {
                 p,
                 order: HashMap::new(),
+                meta_idle: HashMap::new(),
                 seen_incomplete: HashSet::new(),
                 notified: HashSet::new(),
                 global_limit,
@@ -310,8 +326,11 @@ impl Core {
 
         let mut downloads: Vec<Download> = Vec::new();
         let mut notifications: Vec<(&'static str, String)> = Vec::new();
+        let mut kick: Vec<String> = Vec::new();
+        let mut resume: Vec<String> = Vec::new();
         {
             let mut inner = self.inner.lock().unwrap();
+            inner.meta_idle.retain(|g, _| by_gid.contains_key(g));
             for it in &items {
                 let Some(gid) = it["gid"].as_str() else { continue };
                 let raw = it["status"].as_str().unwrap_or("");
@@ -330,9 +349,31 @@ impl Core {
                     .as_str()
                     .map(|p| p.starts_with("[METADATA]"))
                     .unwrap_or(false);
+                let mut kicking = false;
+                if is_meta {
+                    let idle = inner.meta_idle.entry(gid.to_string()).or_default();
+                    match raw {
+                        "active" if n(&it["connections"]) == 0 => {
+                            let since = *idle.since.get_or_insert_with(Instant::now);
+                            if since.elapsed() >= META_KICK_AFTER {
+                                idle.since = None;
+                                idle.kicking = true;
+                                idle.kicks += 1;
+                                kick.push(gid.to_string());
+                            }
+                        }
+                        "active" => idle.since = None,
+                        "paused" if idle.kicking => {
+                            idle.kicking = false;
+                            resume.push(gid.to_string());
+                        }
+                        _ => {}
+                    }
+                    kicking = idle.kicking || resume.iter().any(|g| g == gid);
+                }
                 let status = if inner.p.selecting.contains(gid) && raw == "paused" {
                     "selecting"
-                } else if is_meta && (raw == "active" || raw == "waiting") {
+                } else if is_meta && (raw == "active" || raw == "waiting" || (raw == "paused" && kicking)) {
                     "metadata"
                 } else {
                     raw
@@ -384,6 +425,12 @@ impl Core {
                     seq,
                 });
             }
+        }
+        for g in kick {
+            let _ = self.aria.call("forcePause", vec![json!(g)]).await;
+        }
+        for g in resume {
+            let _ = self.aria.call("unpause", vec![json!(g)]).await;
         }
         if self.cfg.notifications {
             for (t, b) in notifications {
@@ -459,7 +506,9 @@ impl Core {
         Ok(d.display().to_string())
     }
 
-    pub async fn add(&self, input: &str, dir: Option<String>, video: Option<VideoPrefs>) -> Result<Value> {
+    /// `select`: let the user pick files of a single torrent before it starts
+    /// (false = download every file right away, like a batch).
+    pub async fn add(&self, input: &str, dir: Option<String>, video: Option<VideoPrefs>, select: bool) -> Result<Value> {
         let target = detect(input).map_err(|e| anyhow!(e))?;
         let dir = self.resolve_dir(dir)?;
         let mut ids: Vec<String> = Vec::new();
@@ -476,7 +525,7 @@ impl Core {
                     }
                 }
             }
-            t => ids = self.add_one(t, &dir, video, true).await?,
+            t => ids = self.add_one(t, &dir, video, select).await?,
         }
         self.yt.tick();
         Ok(json!({"ids": ids, "errors": errors}))

@@ -47,6 +47,20 @@ fn free_port() -> Result<u16> {
     Ok(l.local_addr()?.port())
 }
 
+/// Stable public trackers added to every torrent.
+const EXTRA_TRACKERS: &[&str] = &[
+    "udp://tracker.opentrackr.org:1337/announce",
+    "http://tracker.opentrackr.org:1337/announce",
+    "udp://open.demonii.com:1337/announce",
+    "udp://open.stealth.si:80/announce",
+    "udp://tracker.torrent.eu.org:451/announce",
+    "udp://exodus.desync.com:6969/announce",
+    "udp://explodie.org:6969/announce",
+    "udp://tracker.dler.org:6969/announce",
+    "udp://tracker.qu.ax:6969/announce",
+    "udp://tracker-udp.gbitt.info:80/announce",
+];
+
 pub async fn spawn(cfg: &Config, data_dir: &Path) -> Result<(Child, Aria2)> {
     let port = free_port()?;
     let token = random_hex(16);
@@ -77,6 +91,10 @@ pub async fn spawn(cfg: &Config, data_dir: &Path) -> Result<(Child, Aria2)> {
         "--auto-file-renaming=true".to_string(),
         "--file-allocation=none".to_string(),
         "--enable-dht=true".to_string(),
+        // bootstrap the DHT even without a saved routing table
+        "--dht-entry-point=dht.transmissionbt.com:6881".to_string(),
+        // more peer sources for magnets whose own trackers are dead or slow
+        format!("--bt-tracker={}", EXTRA_TRACKERS.join(",")),
         "--bt-enable-lpd=true".to_string(),
         "--enable-peer-exchange=true".to_string(),
         format!("--max-overall-download-limit={limit}"),
