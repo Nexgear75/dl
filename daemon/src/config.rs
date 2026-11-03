@@ -14,6 +14,9 @@ pub struct Config {
     pub global_limit: String,
     /// macOS notification when a download finishes or fails.
     pub notifications: bool,
+    /// Stop the daemon after this many minutes with nothing downloading and
+    /// no dl/tf window open (0 = never). It restarts on demand.
+    pub idle_exit_minutes: u64,
     pub aria2c_path: String,
     pub ytdlp_path: String,
 }
@@ -26,6 +29,7 @@ impl Default for Config {
             connections: 16,
             global_limit: "0".into(),
             notifications: true,
+            idle_exit_minutes: 5,
             aria2c_path: "aria2c".into(),
             ytdlp_path: "yt-dlp".into(),
         }
@@ -39,6 +43,9 @@ connections = 16
 # "0" = unlimited, otherwise e.g. "5M" or "800K"
 global_limit = "0"
 notifications = true
+# stop the background daemon after N idle minutes (nothing downloading, no
+# window open); it starts again by itself when needed. 0 = keep it running
+idle_exit_minutes = 5
 aria2c_path = "aria2c"
 ytdlp_path = "yt-dlp"
 "#;

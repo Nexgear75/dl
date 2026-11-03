@@ -8,6 +8,8 @@ mod ytdlp;
 
 use anyhow::Result;
 use std::os::fd::AsRawFd;
+use std::os::unix::fs::MetadataExt;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::signal::unix::{SignalKind, signal};
 
@@ -20,6 +22,13 @@ fn redirect_logs(path: &std::path::Path) {
         }
         std::mem::forget(f);
     }
+}
+
+/// Identity of the executable file on disk (an update renames a new file over it).
+fn exe_id() -> Option<(u64, u64)> {
+    let exe = std::env::current_exe().ok()?;
+    let m = std::fs::metadata(exe).ok()?;
+    Some((m.dev(), m.ino()))
 }
 
 #[tokio::main]
@@ -73,6 +82,42 @@ async fn main() -> Result<()> {
                     }
                 }
             }
+        }
+    });
+
+    // Exit when idle (nothing downloading, no client connected), so the daemon
+    // never lingers: the next `dl` (or tf sending a download) starts it again.
+    // - right away once an update replaced this binary on disk
+    // - after `idle_exit_minutes` otherwise
+    let started = exe_id();
+    let mins = core.cfg.idle_exit_minutes;
+    let idle_limit = (mins > 0).then(|| Duration::from_secs(mins * 60));
+    let watcher = core.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(Duration::from_secs(15));
+        // the first poll has not run yet: count as busy until it has
+        tick.tick().await;
+        let mut idle_since: Option<std::time::Instant> = None;
+        loop {
+            tick.tick().await;
+            let idle = watcher.busy.load(Ordering::Relaxed) == 0 && watcher.clients.load(Ordering::Relaxed) == 0;
+            if !idle {
+                idle_since = None;
+                continue;
+            }
+            let since = *idle_since.get_or_insert_with(std::time::Instant::now);
+            let replaced = started.is_some() && exe_id() != started;
+            let reason = if replaced {
+                "binary updated on disk"
+            } else if idle_limit.is_some_and(|l| since.elapsed() >= l) {
+                "idle"
+            } else {
+                continue;
+            };
+            eprintln!("{reason}, stopping (restarts on next use)");
+            watcher.shutdown().await;
+            let _ = std::fs::remove_file(socket_path());
+            std::process::exit(0);
         }
     });
 

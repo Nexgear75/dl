@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
@@ -108,6 +108,10 @@ pub struct Core {
     pub events: broadcast::Sender<String>,
     pub last_state: Mutex<String>,
     state_file: PathBuf,
+    /// downloads currently transferring or queued (updated on every poll)
+    pub busy: AtomicUsize,
+    /// connected TUI / tf clients
+    pub clients: AtomicUsize,
 }
 
 const KEYS: &[&str] = &[
@@ -240,6 +244,8 @@ impl Core {
             events,
             last_state: Mutex::new(String::new()),
             state_file,
+            busy: AtomicUsize::new(0),
+            clients: AtomicUsize::new(0),
         })
     }
 
@@ -466,6 +472,8 @@ impl Core {
 
         let global_limit = self.inner.lock().unwrap().global_limit;
         let active = downloads.iter().filter(|d| d.status == "active" || d.status == "metadata").count();
+        let busy = downloads.iter().filter(|d| matches!(d.status.as_str(), "active" | "metadata" | "waiting")).count();
+        self.busy.store(busy, Ordering::Relaxed);
         let data = json!({
             "downloads": downloads,
             "global": {

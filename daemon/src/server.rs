@@ -129,6 +129,7 @@ pub async fn run(core: Arc<Core>, sock: PathBuf) -> Result<()> {
         let (stream, _) = listener.accept().await?;
         let core = core.clone();
         tokio::spawn(async move {
+            core.clients.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let (rd, mut wr) = stream.into_split();
             let (tx, mut rx) = mpsc::unbounded_channel::<String>();
             let mut events = core.events.subscribe();
@@ -176,6 +177,7 @@ pub async fn run(core: Arc<Core>, sock: PathBuf) -> Result<()> {
             }
             drop(tx);
             writer.abort();
+            core.clients.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         });
     }
 }
